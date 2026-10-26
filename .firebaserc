@@ -1,0 +1,15 @@
+{
+  "projects": {
+    "default": "click-8ef88"
+  },
+  "targets": {
+    "click-8ef88": {
+      "hosting": {
+        "click": [
+          "click-boardgame"
+        ]
+      }
+    }
+  },
+  "etags": {}
+}

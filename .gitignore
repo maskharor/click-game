@@ -42,3 +42,6 @@ ui-debug.log
 
 # Backup
 src_backup_before_update/
+
+# Backup files
+*.bak
