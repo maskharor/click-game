@@ -11,44 +11,6 @@
 
 ---
 
-## 🚀 Cara Setup & Menjalankan
-
-### 1. Setup Firebase (WAJIB)
-
-1. Buka [Firebase Console](https://console.firebase.google.com/)
-2. Buat project baru (atau gunakan yang sudah ada)
-3. Di menu **Build**, aktifkan:
-   - Firestore Database (pilih mode "test" untuk development)
-   - Authentication > Sign-in method > aktifkan **Anonymous**
-4. Di **Project Settings** (ikon gear) > **General** > scroll ke bawah ke **Your apps**
-5. Klik ikon Web (`</>`) untuk mendaftarkan app
-6. Copy konfigurasi Firebase
-
-### 2. Isi Konfigurasi
-
-Buka file `src/firebase.js` dan ganti dengan kredensial kamu:
-
-```js
-const firebaseConfig = {
-  apiKey: "AIzaSy...",
-  authDomain: "nama-project.firebaseapp.com",
-  projectId: "nama-project",
-  storageBucket: "nama-project.appspot.com",
-  messagingSenderId: "1234567890",
-  appId: "1:1234567890:web:abcdef",
-};
-```
-
-### 3. Jalankan Dev Server
-
-```bash
-npm run dev
-```
-
-Buka browser ke: **http://localhost:5173/**
-
----
-
 ## Cara Bermain
 
 1. **Semua pemain** buka URL yang sama di browser masing-masing
@@ -84,30 +46,6 @@ src/
 
 ---
 
-## Skema Database Firestore
-
-```
-firestore/
-+-- gameRooms/
-    +-- click-game-session-v1/
-        |-- status: "waiting" | "playing"
-        |-- currentTurnIndex: 0
-        |-- diceValue: 1
-        |-- round: 1
-        |-- activeCard: { id, type, text } | null
-        |-- log: ["Player A melempar 5...", ...]
-        +-- players: [
-              {
-                id: "uid_firebase",
-                name: "Nama Pemain",
-                colorClass: "bg-red-500",
-                position: 0
-              }
-            ]
-```
-
----
-
 ## Kategori Kartu
 
 | Kategori | Warna | Jumlah |
@@ -119,10 +57,3 @@ firestore/
 
 ---
 
-## Build Production
-
-```bash
-npm run build
-```
-
-Output di folder `dist/` - bisa di-deploy ke Firebase Hosting, Vercel, atau Netlify.
