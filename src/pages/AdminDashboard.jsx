@@ -1,4 +1,4 @@
-// src/pages/AdminDashboard.jsx
+﻿// src/pages/AdminDashboard.jsx
 // Dashboard admin: CRUD Soal (pilgan per level dadu) + CRUD Acara
 
 import { useState, useEffect } from 'react';
@@ -15,12 +15,12 @@ import {
   ChevronDown, ChevronUp,
 } from 'lucide-react';
 
-// ─── Constants ────────────────────────────────────────────────────────────────
+// â”€â”€â”€ Constants â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const LEVEL_LABELS = {
-  1: 'Level 1 (Dadu 1–2) · 1 menit',
-  2: 'Level 2 (Dadu 3) · 2 menit',
-  3: 'Level 3 (Dadu 4) · 3 menit',
-  5: 'Level 5 (Dadu 5–6) · 5 menit',
+  1: 'Level 1 (Dadu 1â€“2) Â· 1 menit',
+  2: 'Level 2 (Dadu 3) Â· 2 menit',
+  3: 'Level 3 (Dadu 4) Â· 3 menit',
+  5: 'Level 5 (Dadu 5â€“6) Â· 5 menit',
 };
 
 const EMPTY_Q = {
@@ -35,7 +35,7 @@ const EMPTY_Q = {
 
 const EMPTY_EVENT = { name: '', date: '', time: '', description: '' };
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
+// â”€â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const levelColor = (lv) => ({
   1: 'bg-green-100  text-green-700  border-green-300',
   2: 'bg-blue-100   text-blue-700   border-blue-300',
@@ -43,7 +43,7 @@ const levelColor = (lv) => ({
   5: 'bg-red-100    text-red-700    border-red-300',
 }[lv] || 'bg-gray-100 text-gray-600');
 
-// ─── Main Component ───────────────────────────────────────────────────────────
+// â”€â”€â”€ Main Component â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 export default function AdminDashboard() {
   const [user, setUser]         = useState(null);
   const [tab, setTab]           = useState('questions');
@@ -73,11 +73,19 @@ export default function AdminDashboard() {
   const loadData = async () => {
     try {
       setLoading(true);
-      const [q, e] = await Promise.all([getQuestions(), getAllEvents()]);
+      setError('');
+      const q = await getQuestions();
       setQuestions(q);
-      setEvents(e);
+      try {
+        const e = await getAllEvents();
+        setEvents(e);
+      } catch (eventErr) {
+        console.warn('Events gagal dimuat (diabaikan):', eventErr.message);
+        setEvents([]);
+      }
     } catch (err) {
-      setError('Gagal memuat data: ' + err.message);
+      console.error('loadData error:', err);
+      setError('Gagal memuat soal: ' + err.message);
     } finally {
       setLoading(false);
     }
@@ -89,7 +97,7 @@ export default function AdminDashboard() {
 
   const resetModal = () => { setModalOpen(false); setEditingId(null); setValErrors([]); };
 
-  // ── Question Modal ──────────────────────────────────────────────────────────
+  // â”€â”€ Question Modal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const openQModal = (q = null) => {
     if (q) {
       setQForm({
@@ -122,7 +130,9 @@ export default function AdminDashboard() {
   };
 
   const saveQ = async () => {
+    console.log('ðŸ”¥ saveQ called!', qForm);   
     const errs = validateQ();
+    console.log('ðŸ“‹ validateQ errors:', errs); 
     if (errs.length) { setValErrors(errs); return; }
     setValErrors([]);
     setSaving(true);
@@ -140,11 +150,14 @@ export default function AdminDashboard() {
         correctAnswer: qForm.correctAnswer,
         explanation:   qForm.explanation.trim(),
       };
+      console.log('ðŸ’¾ Data yang akan disimpan:', data);
       if (editingId) await updateQuestion(editingId, data);
       else           await addQuestion(data);
+      console.log('âœ… Berhasil tersimpan');  
       await loadData();
       resetModal();
     } catch (err) {
+      console.error('âŒ Error saat simpan:', err); 
       alert('Gagal simpan: ' + err.message);
     } finally {
       setSaving(false);
@@ -157,7 +170,7 @@ export default function AdminDashboard() {
     catch (err) { alert('Gagal hapus: ' + err.message); }
   };
 
-  // ── Event Modal ─────────────────────────────────────────────────────────────
+  // â”€â”€ Event Modal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const openEventModal = (ev = null) => {
     setEventForm(ev ? { ...ev } : { ...EMPTY_EVENT });
     setEditingId(ev ? ev.id : null);
@@ -253,7 +266,7 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {/* ── TAB: SOAL ── */}
+        {/* â”€â”€ TAB: SOAL â”€â”€ */}
         {tab === 'questions' && (
           <div className="bg-white rounded-2xl shadow-sm p-6">
             <div className="flex flex-wrap justify-between items-center gap-3 mb-4">
@@ -308,13 +321,13 @@ export default function AdminDashboard() {
                               : 'bg-gray-50 text-gray-500 border-gray-200'
                             }`}>
                             {k}. {q.options?.[k]}
-                            {q.correctAnswer === k && ' ✓'}
+                            {q.correctAnswer === k && ' âœ“'}
                           </span>
                         ))}
                       </div>
                       {showAnswer[q.id] && (
                         <p className="text-xs text-brand-brown/70 mt-2 bg-yellow-50 rounded-lg p-2 border border-yellow-200">
-                          📝 {q.explanation}
+                          ðŸ“ {q.explanation}
                         </p>
                       )}
                     </div>
@@ -339,7 +352,7 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {/* ── TAB: ACARA ── */}
+        {/* â”€â”€ TAB: ACARA â”€â”€ */}
         {tab === 'events' && (
           <div className="bg-white rounded-2xl shadow-sm p-6">
             <div className="flex justify-between items-center mb-4">
@@ -359,7 +372,7 @@ export default function AdminDashboard() {
                   </div>
                   <div className="flex-1">
                     <p className="font-bold text-sm text-brand-brown">{ev.name}</p>
-                    <p className="text-xs text-brand-brown/60">{ev.date} • {ev.time}</p>
+                    <p className="text-xs text-brand-brown/60">{ev.date} â€¢ {ev.time}</p>
                   </div>
                   <div className="flex gap-1 flex-shrink-0">
                     <button onClick={() => openEventModal(ev)} className="p-1.5 text-brand-blue hover:bg-blue-50 rounded-md"><Edit2 size={15} /></button>
@@ -372,7 +385,7 @@ export default function AdminDashboard() {
         )}
       </div>
 
-      {/* ── MODAL: SOAL ── */}
+      {/* â”€â”€ MODAL: SOAL â”€â”€ */}
       {modalOpen === 'question' && (
         <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
           <div className="bg-white rounded-3xl max-w-2xl w-full max-h-[92vh] overflow-y-auto shadow-2xl">
@@ -405,7 +418,7 @@ export default function AdminDashboard() {
                   ))}
                 </select>
                 <p className="text-[10px] text-brand-brown/50 mt-1">
-                  Level 1 = dadu 1–2 · Level 2 = dadu 3 · Level 3 = dadu 4 · Level 5 = dadu 5–6
+                  Level 1 = dadu 1â€“2 Â· Level 2 = dadu 3 Â· Level 3 = dadu 4 Â· Level 5 = dadu 5â€“6
                 </p>
               </div>
 
@@ -483,7 +496,7 @@ export default function AdminDashboard() {
                     />
                   </div>
                 ))}
-                <p className="text-[10px] text-brand-brown/50">🔘 Klik radio button untuk menandai jawaban yang benar.</p>
+                <p className="text-[10px] text-brand-brown/50">ðŸ”˜ Klik radio button untuk menandai jawaban yang benar.</p>
               </div>
 
               {/* Penjelasan */}
@@ -515,7 +528,7 @@ export default function AdminDashboard() {
         </div>
       )}
 
-      {/* ── MODAL: ACARA ── */}
+      {/* â”€â”€ MODAL: ACARA â”€â”€ */}
       {modalOpen === 'event' && (
         <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
           <div className="bg-white rounded-3xl max-w-lg w-full shadow-2xl">
@@ -567,3 +580,4 @@ export default function AdminDashboard() {
     </div>
   );
 }
+
