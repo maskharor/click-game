@@ -18,12 +18,9 @@ const DICE_TIMERS = { 1: 60, 2: 60, 3: 120, 4: 180, 5: 300, 6: 300 };
 const BOARD_SIZE = 36;
 const GRID_COLS = 6;
 const LADDERS = {
-  3: 12,
-  8: 17,
-  10: 22,
-  15: 27,
-  20: 33,
-  25: 32,
+  5: 14,
+  12: 21,
+  22: 31,
 };
 const PAWN_STEP_MS = 350;
 const PLAYER_COLORS = ['#E53E3E', '#3182CE', '#38A169', '#805AD5'];
@@ -112,6 +109,13 @@ export default function HostPage() {
   const startGame = async () => {
     if (!gameState || gameState.players.length < 1) return;
     await updateGame({ status: 'playing', phase: 'idle', currentPlayerIndex: 0 });
+  };
+
+  const removePlayer = async (playerId) => {
+    if (!gameState || gameState.status !== 'waiting') return;
+    if (!confirm('Hapus pemain ini dari room?')) return;
+    const updatedPlayers = gameState.players.filter((p) => p.id !== playerId);
+    await updateGame({ players: updatedPlayers });
   };
 
     const rollDice = async () => {
@@ -338,7 +342,7 @@ export default function HostPage() {
             num % 2 === 0 ? 'bg-brand-lightbg' : 'bg-white'
           }`}
         >
-          <span className="absolute top-0.5 left-1 text-[9px] text-gray-400">{num}</span>
+          <span className="absolute top-0.5 left-1 text-xs sm:text-sm font-bold text-gray-500">{num}</span>
           {isLadder && (
             <span className="absolute -top-0.5 -right-0.5 bg-green-500 text-white text-[9px] font-black rounded-full w-4 h-4 flex items-center justify-center shadow">
               {isLadder}
@@ -411,8 +415,15 @@ export default function HostPage() {
               </h3>
               <div className="flex flex-wrap gap-2 justify-center">
                 {gameState.players.map((p) => (
-                  <div key={p.id} className="px-4 py-2 rounded-full font-bold" style={{ backgroundColor: p.color }}>
+                  <div key={p.id} className="flex items-center gap-2 px-3 py-1.5 rounded-full font-bold text-white shadow" style={{ backgroundColor: p.color }}>
                     {p.name}
+                    <button
+                      onClick={() => removePlayer(p.id)}
+                      className="bg-black/20 hover:bg-black/40 rounded-full w-5 h-5 flex items-center justify-center text-xs font-black transition-colors"
+                      title="Hapus pemain"
+                    >
+                      ✕
+                    </button>
                   </div>
                 ))}
                 {gameState.players.length === 0 && <p className="text-white/40 italic">Menunggu siswa join...</p>}
@@ -431,10 +442,10 @@ export default function HostPage() {
 
       {/* Playing */}
       {gameState?.status === 'playing' && (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           {/* BOARD */}
-          <div className="lg:col-span-2 bg-white rounded-2xl p-3">
-            <div className="grid grid-cols-6 gap-1 aspect-square">
+          <div className="lg:col-span-1 bg-white rounded-2xl p-2">
+            <div className="grid grid-cols-6 grid-rows-6 gap-0.5 sm:gap-1 aspect-square max-h-[85vh]">
               {renderBoard()}
             </div>
           </div>
@@ -624,6 +635,11 @@ export default function HostPage() {
     </div>
   );
 }
+
+
+
+
+
 
 
 
