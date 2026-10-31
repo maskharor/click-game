@@ -21,6 +21,8 @@ export default function PlayerPage() {
   const [now, setNow] = useState(Date.now());
   const [selectedAnswer, setSelectedAnswer] = useState(null);
   const [fillAnswer, setFillAnswer] = useState('');
+  const [showBookModal, setShowBookModal] = useState(false);
+  const [bookTimer, setBookTimer] = useState(15);
   const [showResult, setShowResult] = useState(false);
 
   useEffect(() => {
@@ -59,6 +61,8 @@ export default function PlayerPage() {
           name: name.trim(),
           color,
           position: 0,
+          hasShield: false,
+          hasUsedBook: false,
         }),
       });
       setGameId(game.id);
@@ -111,6 +115,31 @@ export default function PlayerPage() {
       phase: 'result',
       answerSubmitted: { playerId, answer },
     });
+  };
+
+  const handleUseBook = async () => {
+    if (!myPlayer || myPlayer.hasUsedBook) return;
+    setShowBookModal(true);
+    setBookTimer(15);
+    // Tandai sudah pakai buku + bonus 10 detik ke timerDuration
+    const updatedPlayers = gameState.players.map((p) =>
+      p.id === playerId ? { ...p, hasUsedBook: true } : p
+    );
+    const newDuration = (gameState.timerDuration || 0) + 10;
+    await updateDoc(doc(db, 'games', gameId), {
+      players: updatedPlayers,
+      timerDuration: newDuration,
+    });
+    // Countdown 15 detik
+    let t = 15;
+    const iv = setInterval(() => {
+      t -= 1;
+      setBookTimer(t);
+      if (t <= 0) {
+        clearInterval(iv);
+        setShowBookModal(false);
+      }
+    }, 1000);
   };
 
   const getTimerRemaining = () => {
@@ -277,6 +306,17 @@ export default function PlayerPage() {
                 <p className="text-4xl font-black text-white">{timerRemaining}s</p>
               </div>
               <div className="p-6">
+                {!myPlayer?.hasUsedBook && !showResult && (
+                  <button
+                    onClick={handleUseBook}
+                    className="w-full mb-4 py-3 rounded-xl font-black bg-yellow-400 hover:bg-yellow-500 text-brand-brown shadow-lg transition-all"
+                  >
+                    📖 Buka Buku (1× — 15 detik)
+                  </button>
+                )}
+                {myPlayer?.hasUsedBook && (
+                  <p className="text-xs text-center text-gray-400 mb-3 italic">📖 Buku sudah dipakai</p>
+                )}
                 <p className="text-xs font-bold text-brand-blue uppercase mb-2">
                   Level {gameState.currentQuestion?.level || '-'}
                 </p>
@@ -414,6 +454,18 @@ export default function PlayerPage() {
             </div>
             <div className="p-6 text-center">
               <p className="text-sm text-gray-500">Jawaban benar: <b>{gameState.lastResult.correctAnswer}</b></p>
+              {gameState.lastResult.usedShield && (
+                <div className="mt-3 bg-yellow-100 border-2 border-yellow-400 rounded-xl p-3 animate-pulse">
+                  <p className="font-black text-yellow-800 text-sm">🛡️ Kartu Kebal Menyelamatkan!</p>
+                  <p className="text-xs text-yellow-700">Tidak kena pinalti mundur</p>
+                </div>
+              )}
+              {gameState.lastResult.gotShield && (
+                <div className="mt-3 bg-green-100 border-2 border-green-400 rounded-xl p-3 animate-bounce">
+                  <p className="font-black text-green-800 text-sm">🎁🛡️ Dapat Kartu Kebal!</p>
+                  <p className="text-xs text-green-700">Bebas pinalti 1x</p>
+                </div>
+              )}
               <p className="text-lg font-bold text-brand-brown mt-2">
                 {gameState.lastResult.isCorrect ? 'Maju' : 'Mundur'} {Math.abs(gameState.lastResult.delta)} kotak
               </p>
@@ -427,11 +479,20 @@ export default function PlayerPage() {
           </div>
         )}
       </div>
+      {showBookModal && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-yellow-900/90 p-4">
+          <div className="text-center max-w-md">
+            <div className="text-8xl mb-4 animate-pulse">📖</div>
+            <h2 className="text-3xl font-black text-white mb-2">Buku Terbuka!</h2>
+            <p className="text-white/80 mb-6">Cari jawaban di buku. Timer soal dijeda.</p>
+            <div className="text-6xl font-black text-yellow-300 mb-4">{bookTimer}s</div>
+            <p className="text-sm text-white/60">Setelah habis, buku tertutup otomatis</p>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
-
-
 
 
 

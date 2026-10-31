@@ -19,10 +19,11 @@ const BOARD_SIZE = 36;
 const GRID_COLS = 6;
 const LADDERS = {
   5: 14,
-  12: 21,
-  22: 31,
+  12: 17,
+  22: 28,
 };
 const PAWN_STEP_MS = 350;
+const CHECKPOINTS = [10, 20]; // petak checkpoint
 const PLAYER_COLORS = ['#E53E3E', '#3182CE', '#38A169', '#805AD5'];
 
 function squareToGrid(num) {
@@ -31,6 +32,14 @@ function squareToGrid(num) {
   let col = idx % GRID_COLS;
   if (row % 2 !== 0) col = GRID_COLS - 1 - col;
   return { row: 5 - row, col };
+}
+
+// Terapkan checkpoint: kalau mundur melewati checkpoint terakhir, clamp ke checkpoint
+function applyCheckpoint(fromPos, newPos) {
+  if (newPos >= fromPos) return newPos;
+  const lastCheckpoint = CHECKPOINTS.filter((cp) => cp <= fromPos).sort((a, b) => b - a)[0];
+  if (lastCheckpoint && newPos < lastCheckpoint) return lastCheckpoint;
+  return newPos;
 }
 
 function generateRoomCode() {
@@ -172,11 +181,16 @@ export default function HostPage() {
     });
   };
 
-  const handlePass = async () => {
+    const handlePass = async () => {
     await updateGame({
       phase: 'rebuttal',
       currentQuestionFor: null,
     });
+  };
+
+  const handleSkipRebuttal = async () => {
+    // Tidak ada yang rebut — lanjut ke kelompok berikutnya
+    await nextTurn();
   };
 
   const handleSelectForRebuttal = async (playerId) => {
@@ -197,6 +211,7 @@ export default function HostPage() {
       phase: 'question',
       currentQuestion: question,
       currentQuestionFor: playerId,
+      rebuttalPlayerId: playerId,
       timerStart: serverTimestamp(),
       timerDuration: timer,
       resolved: false,
@@ -222,20 +237,38 @@ export default function HostPage() {
       const player = gameState.players.find((p) => p.id === answeredBy);
       if (!player) return;
 
-      const delta = isCorrect ? dice : -dice;
+            // Cek shield (bebas pinalti 1x)
+      const hasShield = !!player.hasShield;
+      const usedShield = !isCorrect && hasShield;
+      const actuallyWrong = !isCorrect && !hasShield;
+
+      const delta = isCorrect ? dice : (actuallyWrong ? -dice : 0);
       let newPos = player.position + delta;
       let snakeOrLadder = null;
-      if (LADDERS[newPos]) { newPos = LADDERS[newPos]; snakeOrLadder = 'ladder'; }
+      if (isCorrect && LADDERS[newPos]) { newPos = LADDERS[newPos]; snakeOrLadder = 'ladder'; }
       newPos = Math.max(0, Math.min(BOARD_SIZE, newPos));
+      // Terapkan checkpoint (hanya untuk mundur)
+      if (actuallyWrong) {
+        newPos = applyCheckpoint(player.position, newPos);
+      }
 
-      const updatedPlayers = gameState.players.map((p) =>
-        p.id === answeredBy ? { ...p, position: newPos } : p
-      );
+      // Reward: dapat kartu kebal kalau berhasil rebut + benar (belum punya shield)
+      const isRebuttal = gameState.rebuttalPlayerId === answeredBy;
+      const canGetShield = isRebuttal && isCorrect && !player.hasShield;
+
+      const updatedPlayers = gameState.players.map((p) => {
+        if (p.id !== answeredBy) return p;
+        return {
+          ...p,
+          position: newPos,
+          hasShield: usedShield ? false : (canGetShield ? true : p.hasShield),
+        };
+      });
 
       await updateGame({
         phase: 'answered',
         resolved: true,
-        lastResult: {
+                lastResult: {
           isCorrect,
           playerId: answeredBy,
           playerName: player.name,
@@ -246,6 +279,9 @@ export default function HostPage() {
           snakeOrLadder,
           correctAnswer: correct,
           selectedAnswer: answer,
+          usedShield,
+          gotShield: canGetShield,
+          wasRebuttal: isRebuttal,
         },
         players: updatedPlayers,
         log: [
@@ -306,6 +342,7 @@ export default function HostPage() {
     await updateGame({
       phase: 'idle',
       currentPlayerIndex: nextIdx,
+      rebuttalPlayerId: null,
       diceValue: null,
       currentQuestion: null,
       currentQuestionFor: null,
@@ -341,11 +378,15 @@ export default function HostPage() {
           key={num}
           style={{ gridRow: row + 1, gridColumn: col + 1 }}
           className={`relative flex items-center justify-center rounded border text-xs font-bold ${
+            CHECKPOINTS.includes(num) ? 'bg-amber-100 border-amber-500 border-2' :
             isLadder ? 'bg-green-100 border-green-400' :
             num % 2 === 0 ? 'bg-brand-lightbg' : 'bg-white'
           }`}
         >
           <span className="absolute top-0.5 left-1 text-xs sm:text-sm font-bold text-gray-500">{num}</span>
+          {CHECKPOINTS.includes(num) && (
+            <span className="absolute bottom-0.5 right-0.5 text-xs" title="Checkpoint">🚩</span>
+          )}
           {isLadder && (
             <span className="absolute -top-0.5 -right-0.5 bg-green-500 text-white text-[9px] font-black rounded-full w-4 h-4 flex items-center justify-center shadow">
               {isLadder}
@@ -498,10 +539,12 @@ export default function HostPage() {
                 </>
               )}
 
-              {gameState.phase === 'rebuttal' && (
+                            {gameState.phase === 'rebuttal' && (
                 <>
                   <p className="text-sm text-white/60 mb-2">Pilih kelompok yang rebutan:</p>
-                  {gameState.players.map((p) => (
+                  {gameState.players
+                    .filter((p) => p.id !== gameState.players[gameState.currentPlayerIndex]?.id)
+                    .map((p) => (
                     <button
                       key={p.id}
                       onClick={() => handleSelectForRebuttal(p.id)}
@@ -511,6 +554,12 @@ export default function HostPage() {
                       {p.name}
                     </button>
                   ))}
+                  <button
+                    onClick={handleSkipRebuttal}
+                    className="w-full mt-3 py-3 rounded-xl font-bold text-white bg-gray-600 hover:bg-gray-700"
+                  >
+                    Skip (tidak ada yang rebut)
+                  </button>
                 </>
               )}
 
@@ -548,7 +597,7 @@ export default function HostPage() {
                 {[...gameState.players].sort((a, b) => b.position - a.position).map((p) => (
                   <div key={p.id} className="flex items-center gap-2 text-sm">
                     <div className="w-3 h-3 rounded-full" style={{ backgroundColor: p.color }} />
-                    <span className="flex-1 font-bold">{p.name}</span>
+                    <span className="flex-1 font-bold">{p.name}{p.hasShield && <span className="ml-1" title="Punya Kartu Kebal">🛡️</span>}</span>
                     <span className="text-brand-yellow font-black">{p.position}</span>
                   </div>
                 ))}
@@ -601,8 +650,7 @@ export default function HostPage() {
               <p className="text-white/90 mt-1 font-bold">{gameState?.lastResult?.playerName}</p>
             </div>
             <div className="p-6 text-center">
-              <p className="text-sm text-gray-500 mb-1">Jawaban benar</p>
-              <p className="text-2xl font-black text-brand-brown mb-4">{gameState?.lastResult?.correctAnswer}</p>
+              <p className="text-sm text-gray-400 mb-1 italic">(Jawaban benar hanya tampil di layar siswa)</p>
               <p className="text-lg font-bold text-brand-brown mb-2">
                 {gameState?.lastResult?.isCorrect ? 'Maju' : 'Mundur'} {Math.abs(gameState?.lastResult?.delta)} kotak
               </p>
@@ -614,6 +662,16 @@ export default function HostPage() {
               <p className="text-sm text-gray-500 mb-4">
                 Posisi: {gameState?.lastResult?.fromPos} → {gameState?.lastResult?.toPos}
               </p>
+              {gameState?.lastResult?.usedShield && (
+                <div className="bg-yellow-100 border-2 border-yellow-400 rounded-xl p-3 mb-3 animate-pulse">
+                  <p className="font-black text-yellow-800 text-sm">🛡️ Kartu Kebal Menyelamatkan! Tidak kena pinalti mundur</p>
+                </div>
+              )}
+              {gameState?.lastResult?.gotShield && (
+                <div className="bg-green-100 border-2 border-green-400 rounded-xl p-3 mb-3 animate-bounce">
+                  <p className="font-black text-green-800 text-sm">🎁🛡️ Dapat Kartu Kebal! Bebas pinalti 1x</p>
+                </div>
+              )}
               {showResultModal && !isAnimating && (
                 <button
                   onClick={handleCloseResultModal}
@@ -638,6 +696,17 @@ export default function HostPage() {
     </div>
   );
 }
+
+
+
+
+
+
+
+
+
+
+
 
 
 
