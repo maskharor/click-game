@@ -1,5 +1,5 @@
-﻿// src/lib/firestore.js
-// Fungsi CRUD untuk koleksi 'cards' dan 'events' di Firestore
+// src/lib/firestore.js
+// Fungsi CRUD untuk koleksi 'questions' (soal pilgan) dan 'events' di Firestore
 
 import { db } from '../firebase';
 import {
@@ -12,47 +12,56 @@ import {
   query,
   orderBy,
   limit,
+  where,
 } from 'firebase/firestore';
 
 // ============================================
-// CARDS
+// QUESTIONS (Soal Pilgan per Level Dadu)
 // ============================================
+// Schema:
+//   level: number (1–5, sesuai DICE_LEVEL dari dadu)
+//   question: string (teks soal)
+//   hasCode: boolean (apakah ada blok kode)
+//   codeSnippet: string (kode jika hasCode = true)
+//   options: { A: string, B: string, C: string }
+//   correctAnswer: 'A' | 'B' | 'C'
+//   explanation: string
 
-export const getCards = async () => {
-  const snap = await getDocs(collection(db, 'cards'));
-  return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-};
-
-export const addCard = (data) => addDoc(collection(db, 'cards'), data);
-
-export const updateCard = (id, data) => updateDoc(doc(db, 'cards', id), data);
-
-export const deleteCard = (id) => deleteDoc(doc(db, 'cards', id));
-
-// ============================================
-// EVENTS
-// ============================================
-
-// Ambil N event terdekat (default 3)
-export const getEvents = async (limitCount = 3) => {
-  const q = query(
-    collection(db, 'events'),
-    orderBy('date', 'asc'),
-    limit(limitCount)
-  );
+export const getQuestions = async () => {
+  const q = query(collection(db, 'questions'), orderBy('level', 'asc'));
   const snap = await getDocs(q);
   return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
 };
 
-// Ambil semua event (untuk "Tampilkan Lebih Banyak")
+/** Ambil soal per level dadu, kembalikan 1 secara acak */
+export const getRandomQuestionByLevel = async (level) => {
+  const q = query(collection(db, 'questions'), where('level', '==', level));
+  const snap = await getDocs(q);
+  if (snap.empty) return null;
+  const docs = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+  return docs[Math.floor(Math.random() * docs.length)];
+};
+
+export const addQuestion    = (data)      => addDoc(collection(db, 'questions'), data);
+export const updateQuestion = (id, data)  => updateDoc(doc(db, 'questions', id), data);
+export const deleteQuestion = (id)        => deleteDoc(doc(db, 'questions', id));
+
+// ============================================
+// EVENTS (Acara Komunitas — untuk Landing Page)
+// ============================================
+
+export const getEvents = async (limitCount = 3) => {
+  const q = query(collection(db, 'events'), orderBy('date', 'asc'), limit(limitCount));
+  const snap = await getDocs(q);
+  return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+};
+
 export const getAllEvents = async () => {
   const q = query(collection(db, 'events'), orderBy('date', 'asc'));
   const snap = await getDocs(q);
   return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
 };
 
-export const addEvent = (data) => addDoc(collection(db, 'events'), data);
-
-export const updateEvent = (id, data) => updateDoc(doc(db, 'events', id), data);
-
-export const deleteEvent = (id) => deleteDoc(doc(db, 'events', id));
+export const addEvent    = (data)      => addDoc(collection(db, 'events'), data);
+export const updateEvent = (id, data)  => updateDoc(doc(db, 'events', id), data);
+export const deleteEvent = (id)        => deleteDoc(doc(db, 'events', id));
