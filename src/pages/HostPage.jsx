@@ -522,7 +522,7 @@ export default function HostPage() {
 
               {gameState.phase === 'answered' && (
                 <button onClick={nextTurn} className="w-full bg-brand-blue hover:bg-blue-600 text-white font-black py-3 rounded-xl">
-                  âž¡ï¸ Giliran Berikutnya
+                  Giliran Berikutnya
                 </button>
               )}
             </div>
