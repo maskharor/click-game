@@ -20,6 +20,7 @@ export default function PlayerPage() {
   const [loading, setLoading] = useState(false);
   const [now, setNow] = useState(Date.now());
   const [selectedAnswer, setSelectedAnswer] = useState(null);
+  const [fillAnswer, setFillAnswer] = useState('');
   const [showResult, setShowResult] = useState(false);
 
   useEffect(() => {
@@ -81,6 +82,7 @@ export default function PlayerPage() {
   useEffect(() => {
     if (gameState?.phase === 'idle') {
       setSelectedAnswer(null);
+      setFillAnswer('');
       setShowResult(false);
     }
   }, [gameState?.phase]);
@@ -96,6 +98,18 @@ export default function PlayerPage() {
     await updateDoc(doc(db, 'games', gameId), {
       phase: 'result',
       answerSubmitted: { playerId, answer: key },
+    });
+  };
+
+  const submitFillAnswer = async () => {
+    if (!isMyQuestion) return;
+    const answer = fillAnswer.trim();
+    if (!answer) return;
+    setSelectedAnswer(answer);
+    setShowResult(true);
+    await updateDoc(doc(db, 'games', gameId), {
+      phase: 'result',
+      answerSubmitted: { playerId, answer },
     });
   };
 
@@ -267,38 +281,101 @@ export default function PlayerPage() {
                   Level {gameState.currentQuestion?.level || '-'}
                 </p>
                 <p className="text-lg font-bold text-brand-brown mb-4">
-                  {gameState.currentQuestion?.text || 'Soal tidak ditemukan'}
+                  {gameState.currentQuestion?.question || 'Soal tidak ditemukan'}
                 </p>
-                {gameState.currentQuestion?.codeBlock && (
+                {gameState.currentQuestion?.codeSnippet && (
                   <pre className="bg-gray-900 text-green-400 p-3 rounded-lg text-xs overflow-x-auto mb-4 font-mono">
-                    {gameState.currentQuestion.codeBlock}
+                    {gameState.currentQuestion.codeSnippet}
                   </pre>
                 )}
-                <div className="space-y-2">
-                  {['A', 'B', 'C'].map((k) => {
-                    const optText = gameState.currentQuestion?.options?.[k];
-                    if (!optText) return null;
-                    let cls = 'border-2 border-gray-200 hover:border-brand-blue';
-                    if (showResult) {
-                      if (k === gameState.currentQuestion.correctAnswer) cls = 'border-2 border-green-500 bg-green-50';
-                      else if (k === selectedAnswer) cls = 'border-2 border-red-500 bg-red-50';
-                      else cls = 'border-2 border-gray-200 opacity-50';
-                    } else if (k === selectedAnswer) {
-                      cls = 'border-2 border-brand-pink bg-pink-50';
-                    }
+                {/* Render soal per tipe */}
+                {(() => {
+                  const qType = gameState.currentQuestion?.questionType || 'multiple_choice';
+
+                  if (qType === 'true_false') {
                     return (
-                      <button
-                        key={k}
-                        onClick={() => submitAnswer(k)}
-                        disabled={showResult}
-                        className={'w-full text-left p-4 rounded-xl font-bold transition-all ' + cls}
-                      >
-                        <span className="inline-block bg-white rounded-md w-7 h-7 text-center leading-7 border font-bold text-sm mr-3">{k}</span>
-                        {optText}
-                      </button>
+                      <div className="grid grid-cols-2 gap-3">
+                        {['true', 'false'].map((v) => {
+                          let cls = 'border-2 border-gray-200 hover:border-brand-blue bg-white';
+                          if (showResult) {
+                            if (v === gameState.currentQuestion.correctAnswer) cls = 'border-2 border-green-500 bg-green-50';
+                            else if (v === selectedAnswer) cls = 'border-2 border-red-500 bg-red-50';
+                            else cls = 'border-2 border-gray-200 opacity-50';
+                          } else if (v === selectedAnswer) {
+                            cls = 'border-2 border-brand-pink bg-pink-50';
+                          }
+                          return (
+                            <button
+                              key={v}
+                              onClick={() => submitAnswer(v)}
+                              disabled={showResult}
+                              className={'py-6 rounded-xl font-black text-xl transition-all ' + cls}
+                            >
+                              {v === 'true' ? 'TRUE' : 'FALSE'}
+                            </button>
+                          );
+                        })}
+                      </div>
                     );
-                  })}
-                </div>
+                  }
+
+                  if (qType === 'fill_blank') {
+                    return (
+                      <div className="space-y-3">
+                        <input
+                          type="text"
+                          value={fillAnswer}
+                          onChange={(e) => setFillAnswer(e.target.value)}
+                          onKeyDown={(e) => { if (e.key === 'Enter' && !showResult) submitFillAnswer(); }}
+                          placeholder="Ketik jawabanmu..."
+                          disabled={showResult}
+                          autoComplete="off"
+                          className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-brand-pink focus:outline-none font-bold text-lg text-brand-brown text-center"
+                        />
+                        <button
+                          onClick={submitFillAnswer}
+                          disabled={showResult || !fillAnswer.trim()}
+                          className={'w-full py-4 rounded-xl font-black text-lg transition-all ' + (
+                            showResult || !fillAnswer.trim()
+                              ? 'bg-gray-300 text-white cursor-not-allowed'
+                              : 'bg-brand-pink hover:bg-pink-500 text-white shadow-lg'
+                          )}
+                        >
+                          {showResult ? 'Sudah dikirim' : 'Kirim Jawaban'}
+                        </button>
+                      </div>
+                    );
+                  }
+
+                  // multiple_choice
+                  return (
+                    <div className="space-y-2">
+                      {['A', 'B', 'C', 'D'].map((k) => {
+                        const optText = gameState.currentQuestion?.options?.[k];
+                        if (!optText) return null;
+                        let cls = 'border-2 border-gray-200 hover:border-brand-blue';
+                        if (showResult) {
+                          if (k === gameState.currentQuestion.correctAnswer) cls = 'border-2 border-green-500 bg-green-50';
+                          else if (k === selectedAnswer) cls = 'border-2 border-red-500 bg-red-50';
+                          else cls = 'border-2 border-gray-200 opacity-50';
+                        } else if (k === selectedAnswer) {
+                          cls = 'border-2 border-brand-pink bg-pink-50';
+                        }
+                        return (
+                          <button
+                            key={k}
+                            onClick={() => submitAnswer(k)}
+                            disabled={showResult}
+                            className={'w-full text-left p-4 rounded-xl font-bold transition-all ' + cls}
+                          >
+                            <span className="inline-block bg-white rounded-md w-7 h-7 text-center leading-7 border font-bold text-sm mr-3">{k}</span>
+                            {optText}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  );
+                })()}
                 {showResult && (
                   <div className="mt-4 p-3 rounded-xl bg-brand-lightbg">
                     <p className="text-sm font-bold text-brand-brown">Jawaban terkirim! Menunggu guru menilai...</p>
@@ -353,4 +430,8 @@ export default function PlayerPage() {
     </div>
   );
 }
+
+
+
+
 

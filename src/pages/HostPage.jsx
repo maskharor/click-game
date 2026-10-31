@@ -213,7 +213,10 @@ export default function HostPage() {
     const run = async () => {
       const { playerId: answeredBy, answer } = gameState.answerSubmitted;
       const correct = gameState.currentQuestion?.correctAnswer;
-      const isCorrect = answer === correct;
+      const qType = gameState.currentQuestion?.questionType || 'multiple_choice';
+      const isCorrect = qType === 'fill_blank'
+        ? (String(answer) || '').trim().toLowerCase() === (String(correct) || '').trim().toLowerCase()
+        : answer === correct;
       const dice = gameState.diceValue || 1;
 
       const player = gameState.players.find((p) => p.id === answeredBy);
@@ -635,6 +638,7 @@ export default function HostPage() {
     </div>
   );
 }
+
 
 
 

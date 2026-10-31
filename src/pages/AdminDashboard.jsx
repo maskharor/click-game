@@ -17,10 +17,17 @@ import {
 
 // â”€â”€â”€ Constants â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const LEVEL_LABELS = {
-  1: 'Level 1 (Dadu 1â€“2) Â· 1 menit',
-  2: 'Level 2 (Dadu 3) Â· 2 menit',
-  3: 'Level 3 (Dadu 4) Â· 3 menit',
-  5: 'Level 5 (Dadu 5â€“6) Â· 5 menit',
+  1: 'Level 1 (Dadu 1-2) - True/False - 1 menit',
+  2: 'Level 2 (Dadu 3) - Multiple Choice - 2 menit',
+  3: 'Level 3 (Dadu 4) - Multiple Choice - 3 menit',
+  5: 'Level 5 (Dadu 5-6) - Fill in the Blank - 5 menit',
+};
+
+// Mapping level -> questionType
+const getQuestionType = (level) => {
+  if (level === 1) return 'true_false';
+  if (level === 2 || level === 3) return 'multiple_choice';
+  return 'fill_blank'; // level 5
 };
 
 const EMPTY_Q = {
@@ -28,8 +35,8 @@ const EMPTY_Q = {
   question: '',
   hasCode: false,
   codeSnippet: '',
-  options: { A: '', B: '', C: '' },
-  correctAnswer: 'A',
+  options: { A: '', B: '', C: '', D: '' },
+  correctAnswer: 'true',  // default untuk true_false
   explanation: '',
 };
 
@@ -100,18 +107,24 @@ export default function AdminDashboard() {
   // â”€â”€ Question Modal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const openQModal = (q = null) => {
     if (q) {
+      const qType = q.questionType || getQuestionType(q.level);
       setQForm({
         level:       q.level ?? 1,
         question:    q.question ?? '',
         hasCode:     q.hasCode ?? false,
         codeSnippet: q.codeSnippet ?? '',
-        options:     q.options ?? { A: '', B: '', C: '' },
-        correctAnswer: q.correctAnswer ?? 'A',
+        options:     q.options ?? { A: '', B: '', C: '', D: '' },
+        correctAnswer: q.correctAnswer ?? (qType === 'true_false' ? 'true' : 'A'),
         explanation: q.explanation ?? '',
       });
       setEditingId(q.id);
     } else {
-      setQForm({ ...EMPTY_Q, options: { A: '', B: '', C: '' } });
+      const defaultType = getQuestionType(1);
+      setQForm({
+        ...EMPTY_Q,
+        options: { A: '', B: '', C: '', D: '' },
+        correctAnswer: defaultType === 'true_false' ? 'true' : (defaultType === 'multiple_choice' ? 'A' : ''),
+      });
       setEditingId(null);
     }
     setValErrors([]);
@@ -120,44 +133,60 @@ export default function AdminDashboard() {
 
   const validateQ = () => {
     const e = [];
-    if (!qForm.question.trim())        e.push('Teks soal wajib diisi');
-    if (!qForm.options.A?.trim())      e.push('Opsi A wajib diisi');
-    if (!qForm.options.B?.trim())      e.push('Opsi B wajib diisi');
-    if (!qForm.options.C?.trim())      e.push('Opsi C wajib diisi');
-    if (!qForm.explanation?.trim())    e.push('Penjelasan/kunci jawaban wajib diisi');
+    if (!qForm.question.trim()) e.push('Teks soal wajib diisi');
+    if (!qForm.explanation?.trim()) e.push('Penjelasan wajib diisi');
     if (qForm.hasCode && !qForm.codeSnippet?.trim()) e.push('Blok kode wajib diisi (karena "Ada Kode" dicentang)');
+
+    const qType = getQuestionType(qForm.level);
+    if (qType === 'true_false') {
+      if (!['true', 'false'].includes(qForm.correctAnswer)) e.push('Jawaban harus True atau False');
+    } else if (qType === 'multiple_choice') {
+      if (!qForm.options.A?.trim()) e.push('Opsi A wajib diisi');
+      if (!qForm.options.B?.trim()) e.push('Opsi B wajib diisi');
+      if (!qForm.options.C?.trim()) e.push('Opsi C wajib diisi');
+      if (!qForm.options.D?.trim()) e.push('Opsi D wajib diisi');
+      if (!['A', 'B', 'C', 'D'].includes(qForm.correctAnswer)) e.push('Kunci jawaban harus A, B, C, atau D');
+    } else if (qType === 'fill_blank') {
+      if (!qForm.correctAnswer?.trim()) e.push('Jawaban isian wajib diisi');
+    }
     return e;
   };
 
-  const saveQ = async () => {
-    console.log('ðŸ”¥ saveQ called!', qForm);   
+    const saveQ = async () => {
     const errs = validateQ();
-    console.log('ðŸ“‹ validateQ errors:', errs); 
     if (errs.length) { setValErrors(errs); return; }
     setValErrors([]);
     setSaving(true);
     try {
+      const qType = getQuestionType(qForm.level);
       const data = {
-        level:        Number(qForm.level),
-        question:     qForm.question.trim(),
-        hasCode:      qForm.hasCode,
-        codeSnippet:  qForm.hasCode ? qForm.codeSnippet.trim() : '',
-        options: {
+        level: Number(qForm.level),
+        questionType: qType,
+        question: qForm.question.trim(),
+        hasCode: qForm.hasCode,
+        codeSnippet: qForm.hasCode ? qForm.codeSnippet.trim() : '',
+        explanation: qForm.explanation.trim(),
+        correctAnswer: qType === 'fill_blank'
+          ? qForm.correctAnswer.trim()
+          : qForm.correctAnswer,
+      };
+
+      if (qType === 'multiple_choice') {
+        data.options = {
           A: qForm.options.A.trim(),
           B: qForm.options.B.trim(),
           C: qForm.options.C.trim(),
-        },
-        correctAnswer: qForm.correctAnswer,
-        explanation:   qForm.explanation.trim(),
-      };
-      console.log('ðŸ’¾ Data yang akan disimpan:', data);
+          D: qForm.options.D.trim(),
+        };
+      }
+
       if (editingId) await updateQuestion(editingId, data);
-      else           await addQuestion(data);
-      console.log('âœ… Berhasil tersimpan');  
+      else await addQuestion(data);
+
       await loadData();
       resetModal();
     } catch (err) {
-      console.error('âŒ Error saat simpan:', err); 
+      console.error('Error simpan:', err);
       alert('Gagal simpan: ' + err.message);
     } finally {
       setSaving(false);
@@ -313,18 +342,46 @@ export default function AdminDashboard() {
                           <Code size={10} /> Ada blok kode
                         </span>
                       )}
-                      <div className="flex flex-wrap gap-1 text-[11px]">
-                        {['A', 'B', 'C'].map((k) => (
-                          <span key={k} className={`px-2 py-0.5 rounded-md font-bold border
-                            ${q.correctAnswer === k
-                              ? 'bg-green-100 text-green-700 border-green-300'
-                              : 'bg-gray-50 text-gray-500 border-gray-200'
-                            }`}>
-                            {k}. {q.options?.[k]}
-                            {q.correctAnswer === k && ' âœ“'}
-                          </span>
-                        ))}
-                      </div>
+                                            {(() => {
+                        const qType = q.questionType || 'multiple_choice';
+                        if (qType === 'true_false') {
+                          return (
+                            <div className="flex gap-2 text-[11px]">
+                              {['true', 'false'].map((v) => (
+                                <span key={v} className={`px-2 py-0.5 rounded-md font-bold border ${
+                                  q.correctAnswer === v
+                                    ? 'bg-green-100 text-green-700 border-green-300'
+                                    : 'bg-gray-50 text-gray-500 border-gray-200'
+                                }`}>
+                                  {v === 'true' ? 'TRUE' : 'FALSE'}
+                                  {q.correctAnswer === v && ' ✓'}
+                                </span>
+                              ))}
+                            </div>
+                          );
+                        }
+                        if (qType === 'fill_blank') {
+                          return (
+                            <span className="inline-block px-2 py-0.5 rounded-md font-bold text-[11px] bg-green-100 text-green-700 border border-green-300">
+                              Jawaban: {q.correctAnswer}
+                            </span>
+                          );
+                        }
+                        return (
+                          <div className="flex flex-wrap gap-1 text-[11px]">
+                            {['A', 'B', 'C', 'D'].map((k) => (
+                              <span key={k} className={`px-2 py-0.5 rounded-md font-bold border ${
+                                q.correctAnswer === k
+                                  ? 'bg-green-100 text-green-700 border-green-300'
+                                  : 'bg-gray-50 text-gray-500 border-gray-200'
+                              }`}>
+                                {k}. {q.options?.[k] || '-'}
+                                {q.correctAnswer === k && ' ✓'}
+                              </span>
+                            ))}
+                          </div>
+                        );
+                      })()}
                       {showAnswer[q.id] && (
                         <p className="text-xs text-brand-brown/70 mt-2 bg-yellow-50 rounded-lg p-2 border border-yellow-200">
                           ðŸ“ {q.explanation}
@@ -467,37 +524,87 @@ export default function AdminDashboard() {
                 )}
               </div>
 
-              {/* Opsi A, B, C */}
-              <div className="space-y-3">
-                <label className="block text-sm font-bold text-brand-brown">
-                  Pilihan Jawaban <span className="text-red-500">*</span>
-                </label>
-                {['A', 'B', 'C'].map((k) => (
-                  <div key={k} className="flex items-center gap-2">
-                    <span className={`w-7 h-7 flex-shrink-0 rounded-full flex items-center justify-center text-xs font-black border-2
-                      ${qForm.correctAnswer === k
-                        ? 'bg-green-500 text-white border-green-500'
-                        : 'bg-white text-brand-brown border-gray-300'
-                      }`}>{k}</span>
+                            {/* === FORM DINAMIS PER TIPE === */}
+              {(() => {
+                const qType = getQuestionType(qForm.level);
+
+                if (qType === 'true_false') {
+                  return (
+                    <div className="space-y-3">
+                      <label className="block text-sm font-bold text-brand-brown">
+                        Jawaban Benar <span className="text-red-500">*</span>
+                      </label>
+                      <div className="grid grid-cols-2 gap-3">
+                        {['true', 'false'].map((v) => (
+                          <button
+                            key={v}
+                            type="button"
+                            onClick={() => setQForm({ ...qForm, correctAnswer: v })}
+                            className={`py-3 rounded-xl font-black text-lg transition-all border-2 ${
+                              qForm.correctAnswer === v
+                                ? 'bg-green-500 text-white border-green-500 shadow-lg'
+                                : 'bg-white text-brand-brown border-gray-300 hover:border-brand-pink'
+                            }`}
+                          >
+                            {v === 'true' ? 'TRUE' : 'FALSE'}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                }
+
+                if (qType === 'multiple_choice') {
+                  return (
+                    <div className="space-y-3">
+                      <label className="block text-sm font-bold text-brand-brown">
+                        Pilihan Jawaban A-D <span className="text-red-500">*</span>
+                      </label>
+                      {['A', 'B', 'C', 'D'].map((k) => (
+                        <div key={k} className="flex items-center gap-2">
+                          <span className={`w-7 h-7 flex-shrink-0 rounded-full flex items-center justify-center text-xs font-black border-2 ${
+                            qForm.correctAnswer === k
+                              ? 'bg-green-500 text-white border-green-500'
+                              : 'bg-white text-brand-brown border-gray-300'
+                          }`}>{k}</span>
+                          <input
+                            value={qForm.options[k] || ''}
+                            onChange={(e) => setOption(k, e.target.value)}
+                            placeholder={`Opsi ${k}`}
+                            className="flex-1 px-3 py-2 rounded-xl border-2 border-gray-200 focus:border-brand-pink focus:outline-none font-medium text-sm"
+                          />
+                          <input
+                            type="radio"
+                            name="correctAnswer"
+                            value={k}
+                            checked={qForm.correctAnswer === k}
+                            onChange={() => setQForm({ ...qForm, correctAnswer: k })}
+                            className="w-4 h-4 accent-green-500 flex-shrink-0"
+                            title={`Tandai ${k} sebagai jawaban benar`}
+                          />
+                        </div>
+                      ))}
+                      <p className="text-[10px] text-brand-brown/50">Klik radio button untuk menandai jawaban benar.</p>
+                    </div>
+                  );
+                }
+
+                // fill_blank
+                return (
+                  <div className="space-y-2">
+                    <label className="block text-sm font-bold text-brand-brown">
+                      Kunci Jawaban (isi teks) <span className="text-red-500">*</span>
+                    </label>
                     <input
-                      value={qForm.options[k]}
-                      onChange={(e) => setOption(k, e.target.value)}
-                      placeholder={`Opsi ${k}`}
-                      className="flex-1 px-3 py-2 rounded-xl border-2 border-gray-200 focus:border-brand-pink focus:outline-none font-medium text-sm"
+                      value={qForm.correctAnswer || ''}
+                      onChange={(e) => setQForm({ ...qForm, correctAnswer: e.target.value })}
+                      placeholder="Contoh: char"
+                      className="w-full px-3 py-2 rounded-xl border-2 border-gray-200 focus:border-brand-pink focus:outline-none font-bold text-lg"
                     />
-                    <input
-                      type="radio"
-                      name="correctAnswer"
-                      value={k}
-                      checked={qForm.correctAnswer === k}
-                      onChange={() => setQForm({ ...qForm, correctAnswer: k })}
-                      className="w-4 h-4 accent-green-500 flex-shrink-0"
-                      title={`Tandai ${k} sebagai jawaban benar`}
-                    />
+                    <p className="text-[10px] text-brand-brown/50">Jawaban siswa akan dicek case-insensitive (huruf besar/kecil diabaikan).</p>
                   </div>
-                ))}
-                <p className="text-[10px] text-brand-brown/50">ðŸ”˜ Klik radio button untuk menandai jawaban yang benar.</p>
-              </div>
+                );
+              })()}
 
               {/* Penjelasan */}
               <div>
@@ -580,4 +687,10 @@ export default function AdminDashboard() {
     </div>
   );
 }
+
+
+
+
+
+
 
